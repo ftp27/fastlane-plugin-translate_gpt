@@ -30,7 +30,7 @@ module Fastlane
         content = File.read(localization_file)
 
         # search for the comments associated with the localization key
-        regex = /\/\*\*\n\s*\* @key\s+#{localization_key}\n((\s*\*.*\n)+)\s*\*\/\n\s*"#{localization_key}"/
+        regex = /^\/\*(.+)\*\/\n"#{localization_key}"/ 
         match = content.match(regex)
 
         # return the comments, if found

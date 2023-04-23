@@ -20,13 +20,16 @@ module Fastlane
           to_translate = input_hash
         end
 
-        UI.message "Translating #{input_hash.size} strings..."
+        UI.message "Translating #{to_translate.size} strings..."
 
-        to_translate.each do |key, value|
-          prompt = "Translate the following string from #{params[:source_language]} to #{params[:target_language]}:\n#{value}"
+        to_translate.each_with_index do |(key, value), index|
+          prompt = "Translate the following string from #{params[:source_language]} to #{params[:target_language]}: #{value}"
           context = Helper::TranslateGptHelper.get_context(params[:source_file], key)
           if context && !context.empty?
             prompt += "\n\nAdditional context:\n#{context}"
+          end
+          if params[:context] && !params[:context].empty?
+            prompt += "\n\nCommon context:\n#{params[:context]}"
           end
           # translate the source string to the target language
           response = client.chat(
@@ -36,7 +39,6 @@ module Fastlane
               temperature: params[:temperature],
             }
           )
-          #puts response
           # extract the translated string from the response
           error = response.dig("error", "message")
           if error
@@ -50,7 +52,9 @@ module Fastlane
               UI.warning "Unable to translate #{key} - #{value}"
             end
           end
-          Helper::TranslateGptHelper.timeout params[:request_timeout]
+          if index < to_translate.size - 1
+            Helper::TranslateGptHelper.timeout params[:request_timeout]
+          end
         end
 
         UI.message "Writing #{output_hash.size} strings to #{params[:target_file]}..."
@@ -138,7 +142,14 @@ module Fastlane
               UI.user_error!("Invalid file path: #{value}") unless File.exist?(value)
               UI.user_error!("Translation file must have .strings extension") unless File.extname(value) == ".strings"
             end
-          ),                         
+          ),    
+          FastlaneCore::ConfigItem.new(
+            key: :context,
+            env_name: "GPT_COMMON_CONTEXT",
+            description: "Common context for the translation",
+            optional: true,
+            type: String
+          )                     
         ]
       end
 

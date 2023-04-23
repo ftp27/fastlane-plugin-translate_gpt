@@ -52,6 +52,34 @@ The following options are available for `translate-gpt`:
 | `target_language` | The target language of the translated strings. Required. | `GPT_TARGET_LANGUAGE` |
 | `source_file` | The path to the `Localizable.strings` file to be translated. Defaults to `./Resources/Localizable.strings`. | `GPT_SOURCE_FILE` |
 | `target_file` | The path to the output file for the translated strings. Defaults to `./Resources/Localizable.strings.<target_language>`. | `GPT_TARGET_FILE` |
+| `context` | Common context for the translation | `GPT_COMMON_CONTEXT` |
+
+## Providing context
+
+The `TranslateGptAction` allows you to provide additional context for your translation requests in two ways:
+
+### 1. Using a common context
+
+You can provide a common context for your project that will be used in all translation requests. This can be done by setting the `common` property when calling the `TranslateGptAction`. The `common` property should be a string that describes the context of your project.
+
+```ruby
+translate_gpt(
+  target_language: 'fr',
+  common: "This is a mobile app for ordering food online"
+)
+```
+
+### 2. Adding comments for specific keys
+
+You can also add comments to your Localizable.strings file for specific keys. These comments will be included in the translation request for that key. To add a comment for a specific key, simply include a comment before the key in your Localizable.strings file.
+
+```text
+/* This is a comment for KEY1 */
+"KEY1" = "Value for KEY1";
+```
+
+When you run the `TranslateGptAction`, the comment will be included in the translation request for `KEY1`.
+
 
 ## Authentication
 
