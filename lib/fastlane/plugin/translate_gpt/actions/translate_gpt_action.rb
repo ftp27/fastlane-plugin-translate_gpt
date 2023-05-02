@@ -1,6 +1,7 @@
 require 'fastlane/action'
 require 'openai'
 require_relative '../helper/translate_gpt_helper'
+require 'loco_strings'
 
 module Fastlane
   module Actions
@@ -22,9 +23,9 @@ module Fastlane
 
         UI.message "Translating #{to_translate.size} strings..."
 
-        to_translate.each_with_index do |(key, value), index|
-          prompt = "Translate the following string from #{params[:source_language]} to #{params[:target_language]}: #{value}"
-          context = Helper::TranslateGptHelper.get_context(params[:source_file], key)
+        to_translate.each_with_index do |(key, string), index|
+          prompt = "Translate the following string from #{params[:source_language]} to #{params[:target_language]}: #{string.value}"
+          context = string.comment
           if context && !context.empty?
             prompt += "\n\nAdditional context:\n#{context}"
           end
@@ -46,10 +47,11 @@ module Fastlane
           else
             target_string = response.dig("choices", 0, "message", "content")
             if target_string && !target_string.empty?
-              UI.message "Translating #{key} - #{value} -> #{target_string}"
-              output_hash[key] = target_string
+              UI.message "Translating #{key} - #{string.value} -> #{target_string}"
+              string.value = target_string
+              output_hash[key] = string
             else
-              UI.warning "Unable to translate #{key} - #{value}"
+              UI.warning "Unable to translate #{key} - #{string.value}"
             end
           end
           if index < to_translate.size - 1
@@ -59,12 +61,12 @@ module Fastlane
 
         UI.message "Writing #{output_hash.size} strings to #{params[:target_file]}..."
 
-        # write the output hash to the output file
-        File.open(params[:target_file], "w") do |file|
-          output_hash.each do |key, value|
-            file.puts "\"#{key}\" = \"#{value}\";"
-          end
+        file = LocoStrings.load(params[:target_file])
+        file.read
+        output_hash.each do |key, value|
+          file.update(key, value.value, value.comment)
         end
+        file.write
       end
 
       #####################################################

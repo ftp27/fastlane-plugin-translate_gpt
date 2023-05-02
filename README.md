@@ -15,7 +15,7 @@ fastlane add_plugin translate_gpt
 
 ## About translate-gpt
 
-`translate-gpt` is a fastlane plugin that allows you to easily translate your iOS app's strings using the OpenAI GPT API.
+`translate-gpt` is a fastlane plugin that allows you to easily translate your iOS and Android app's strings using the OpenAI GPT API.
 
 
 ## Features
@@ -50,8 +50,8 @@ The following options are available for `translate-gpt`:
 | `skip_translated` | Whether to skip strings that have already been translated. Defaults to `true`. | `GPT_SKIP_TRANSLATED` |
 | `source_language` | The source language of the strings to be translated. Defaults to auto-detection. | `GPT_SOURCE_LANGUAGE` |
 | `target_language` | The target language of the translated strings. Required. | `GPT_TARGET_LANGUAGE` |
-| `source_file` | The path to the `Localizable.strings` file to be translated. Defaults to `./Resources/Localizable.strings`. | `GPT_SOURCE_FILE` |
-| `target_file` | The path to the output file for the translated strings. Defaults to `./Resources/Localizable.strings.<target_language>`. | `GPT_TARGET_FILE` |
+| `source_file` | The path to the `Localizable.strings` or `strings.xml` file to be translated. | `GPT_SOURCE_FILE` |
+| `target_file` | The path to the output file for the translated strings. | `GPT_TARGET_FILE` |
 | `context` | Common context for the translation | `GPT_COMMON_CONTEXT` |
 
 ## Providing context

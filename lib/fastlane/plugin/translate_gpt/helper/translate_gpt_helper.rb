@@ -1,4 +1,5 @@
 require 'fastlane_core/ui/ui'
+require 'loco_strings'
 
 module Fastlane
   UI = FastlaneCore::UI unless Fastlane.const_defined?("UI")
@@ -9,16 +10,8 @@ module Fastlane
       # @param localization_file [String] The path to the strings file
       # @return [Hash] The strings file as a hash
       def self.get_strings(localization_file)
-        # Read the strings file into a hash
-        strings_file = File.read(localization_file)
-        strings_hash = strings_file.split(/\n/).reduce({}) do |hash, line|
-          match = line.match(/^"(.+)" = "(.+)";$/)
-          if match
-            hash[match[1]] = match[2]
-          end
-          hash
-        end
-        return strings_hash
+        file = LocoStrings.load(localization_file)
+        return file.read
       end
 
       # Get the context associated with a localization key
@@ -26,20 +19,9 @@ module Fastlane
       # @param localization_key [String] The localization key
       # @return [String] The context associated with the localization key
       def self.get_context(localization_file, localization_key)
-        # read the localization file
-        content = File.read(localization_file)
-
-        # search for the comments associated with the localization key
-        regex = /^\/\*(.+)\*\/\n"#{localization_key}"/ 
-        match = content.match(regex)
-
-        # return the comments, if found
-        if match && match.captures.size > 0
-          comments = match.captures[0].strip
-          return comments.gsub(/\n\s*\*\s?/, "\n").strip
-        else
-          return nil
-        end
+        file = LocoStrings.load(localization_file)
+        string = file.read[localization_key]
+        return string.comment
       end
 
       # Sleep for a specified number of seconds, displaying a progress bar
