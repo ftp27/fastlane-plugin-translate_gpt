@@ -24,19 +24,26 @@ module Fastlane
         UI.message "Translating #{to_translate.size} strings..."
 
         to_translate.each_with_index do |(key, string), index|
-          prompt = "Translate the following string from #{params[:source_language]} to #{params[:target_language]}: #{string.value}"
+          prompt = "I want you to act as a translator for a mobile application strings. " + \
+            "You need to answer only with translation and nothing else. No commentaries. " + \
+            "Try to keep length of the translated text. " + \
+            "I will send you a text and you translate it from #{params[:source_language]} to #{params[:target_language]}. "
+          if params[:context] && !params[:context].empty?
+            prompt += "This app is #{params[:context]}. "
+          end 
           context = string.comment
           if context && !context.empty?
-            prompt += "\n\nAdditional context:\n#{context}"
+            prompt += "Additional context is #{context}. "
           end
-          if params[:context] && !params[:context].empty?
-            prompt += "\n\nCommon context:\n#{params[:context]}"
-          end
+          prompt += "Source text:\n#{string.value}"
+
           # translate the source string to the target language
           response = client.chat(
             parameters: {
               model: params[:model_name], 
-              messages: [{ role: "user", content: prompt}], 
+              messages: [
+                { role: "user", content: prompt }
+              ], 
               temperature: params[:temperature],
             }
           )
