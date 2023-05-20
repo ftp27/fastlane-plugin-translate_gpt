@@ -97,6 +97,7 @@ module Fastlane
             key: :request_timeout,
             env_name: "GPT_REQUEST_TIMEOUT",
             description: "Timeout for the request in seconds",
+            type: Integer,
             default_value: 30
           ),
           FastlaneCore::ConfigItem.new(
