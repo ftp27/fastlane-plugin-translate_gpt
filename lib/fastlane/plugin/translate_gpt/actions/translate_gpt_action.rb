@@ -21,13 +21,16 @@ module Fastlane
           to_translate = input_hash
         end
 
-        UI.message "Translating #{to_translate.size} strings..."
+        translation_count = to_translate.size
+        UI.message "Translating #{translation_count} strings..."
+        if translation_count > 0 
+          UI.message "Estimated time: #{translation_count * params[:request_timeout]} seconds"
+        end
 
         to_translate.each_with_index do |(key, string), index|
           prompt = "I want you to act as a translator for a mobile application strings. " + \
-            "You need to answer only with translation and nothing else. No commentaries. " + \
             "Try to keep length of the translated text. " + \
-            "I will send you a text and you translate it from #{params[:source_language]} to #{params[:target_language]}. "
+            "You need to answer only with the translation and nothing else until I say to stop it.  No commentaries." 
           if params[:context] && !params[:context].empty?
             prompt += "This app is #{params[:context]}. "
           end 
@@ -35,7 +38,8 @@ module Fastlane
           if context && !context.empty?
             prompt += "Additional context is #{context}. "
           end
-          prompt += "Source text:\n#{string.value}"
+          prompt += "Translate next text from #{params[:source_language]} to #{params[:target_language]}:\n" +
+            "#{string.value}"
 
           # translate the source string to the target language
           response = client.chat(
@@ -54,7 +58,7 @@ module Fastlane
           else
             target_string = response.dig("choices", 0, "message", "content")
             if target_string && !target_string.empty?
-              UI.message "Translating #{key} - #{string.value} -> #{target_string}"
+              UI.message "[#{index + 1}/#{translation_count}] Translating #{key} - #{string.value} -> #{target_string}"
               string.value = target_string
               output_hash[key] = string
             else
