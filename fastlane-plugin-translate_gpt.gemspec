@@ -12,6 +12,10 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/ftp27/fastlane-plugin-translate_gpt"
   spec.license       = "MIT"
 
+  spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["source_code_uri"] = "https://github.com/ftp27/fastlane-plugin-translate_gpt"
+  spec.metadata["github_repo"] = "https://github.com/ftp27/fastlane-plugin-translate_gpt"
+
   spec.files         = Dir["lib/**/*"] + %w(README.md LICENSE)
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
