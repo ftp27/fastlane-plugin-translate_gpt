@@ -7,77 +7,11 @@ module Fastlane
   module Actions
     class TranslateGptAction < Action
       def self.run(params)
-        client = OpenAI::Client.new(
-          access_token: params[:api_token],
-          request_timeout: params[:request_timeout]
-        )
-        
-        input_hash = Helper::TranslateGptHelper.get_strings(params[:source_file])
-        output_hash = Helper::TranslateGptHelper.get_strings(params[:target_file])
-
-        if params[:skip_translated]
-          to_translate = input_hash.reject { |k, v| output_hash[k] }
-        else 
-          to_translate = input_hash
-        end
-
-        translation_count = to_translate.size
-        UI.message "Translating #{translation_count} strings..."
-        if translation_count > 0 
-          UI.message "Estimated time: #{translation_count * params[:request_timeout]} seconds"
-        end
-
-        to_translate.each_with_index do |(key, string), index|
-          prompt = "I want you to act as a translator for a mobile application strings. " + \
-            "Try to keep length of the translated text. " + \
-            "You need to answer only with the translation and nothing else until I say to stop it.  No commentaries." 
-          if params[:context] && !params[:context].empty?
-            prompt += "This app is #{params[:context]}. "
-          end 
-          context = string.comment
-          if context && !context.empty?
-            prompt += "Additional context is #{context}. "
-          end
-          prompt += "Translate next text from #{params[:source_language]} to #{params[:target_language]}:\n" +
-            "#{string.value}"
-
-          # translate the source string to the target language
-          response = client.chat(
-            parameters: {
-              model: params[:model_name], 
-              messages: [
-                { role: "user", content: prompt }
-              ], 
-              temperature: params[:temperature],
-            }
-          )
-          # extract the translated string from the response
-          error = response.dig("error", "message")
-          if error
-            UI.error "Error translating #{key}: #{error}"
-          else
-            target_string = response.dig("choices", 0, "message", "content")
-            if target_string && !target_string.empty?
-              UI.message "[#{index + 1}/#{translation_count}] Translating #{key} - #{string.value} -> #{target_string}"
-              string.value = target_string
-              output_hash[key] = string
-            else
-              UI.warning "Unable to translate #{key} - #{string.value}"
-            end
-          end
-          if index < to_translate.size - 1
-            Helper::TranslateGptHelper.timeout params[:request_timeout]
-          end
-        end
-
-        UI.message "Writing #{output_hash.size} strings to #{params[:target_file]}..."
-
-        file = LocoStrings.load(params[:target_file])
-        file.read
-        output_hash.each do |key, value|
-          file.update(key, value.value, value.comment)
-        end
-        file.write
+        helper = Helper::TranslateGptHelper.new(params)
+        helper.prepare_hashes()
+        helper.log_input()
+        helper.translate_strings()
+        helper.write_output()
       end
 
       #####################################################
