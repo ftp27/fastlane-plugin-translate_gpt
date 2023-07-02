@@ -9,8 +9,13 @@ module Fastlane
       def self.run(params)
         helper = Helper::TranslateGptHelper.new(params)
         helper.prepare_hashes()
-        helper.log_input()
-        helper.translate_strings()
+        bunch_size = params[:bunch_size] 
+        helper.log_input(bunch_size)
+        if bunch_size.nil? || bunch_size < 1
+          helper.translate_strings()
+        else 
+          helper.translate_bunch_of_strings(bunch_size)
+        end
         helper.write_output()
       end
 
@@ -97,7 +102,14 @@ module Fastlane
             description: "Common context for the translation",
             optional: true,
             type: String
-          )                     
+          ), 
+          FastlaneCore::ConfigItem.new(
+            key: :bunch_size,
+            env_name: "GPT_BUNCH_SIZE",
+            description: "Number of strings to translate in a single request",
+            optional: true,
+            type: Integer
+          ),                    
         ]
       end
 

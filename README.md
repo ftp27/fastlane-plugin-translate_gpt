@@ -53,6 +53,9 @@ The following options are available for `translate-gpt`:
 | `source_file` | The path to the `Localizable.strings` or `strings.xml` file to be translated. | `GPT_SOURCE_FILE` |
 | `target_file` | The path to the output file for the translated strings. | `GPT_TARGET_FILE` |
 | `context` | Common context for the translation | `GPT_COMMON_CONTEXT` |
+| `bunch_size` | Number of strings to translate in a single request.| `GPT_BUNCH_SIZE` |
+
+**Note:** __I advise using `bunch_size`. It will reduce the number of API requests and translations will be more accurate.__
 
 ## Providing context
 

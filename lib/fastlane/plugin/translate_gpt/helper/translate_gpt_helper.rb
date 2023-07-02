@@ -1,5 +1,6 @@
 require 'fastlane_core/ui/ui'
 require 'loco_strings'
+require 'json'
 
 module Fastlane
   UI = FastlaneCore::UI unless Fastlane.const_defined?("UI")
@@ -23,12 +24,16 @@ module Fastlane
       end
 
       # Log information about the input strings
-      def log_input() 
+      def log_input(bunch_size) 
         @translation_count = @to_translate.size
         number_of_strings = Colorizer::colorize("#{@translation_count}", :blue)
         UI.message "Translating #{number_of_strings} strings..."
-        if @translation_count > 0 
+        if bunch_size.nil? || bunch_size < 1
           estimated_string = Colorizer::colorize("#{@translation_count * @params[:request_timeout]}", :white)
+          UI.message "Estimated time: #{estimated_string} seconds"
+        else 
+          number_of_bunches = (@translation_count / bunch_size.to_f).ceil
+          estimated_string = Colorizer::colorize("#{number_of_bunches * @params[:request_timeout]}", :white)
           UI.message "Estimated time: #{estimated_string} seconds"
         end
       end
@@ -58,6 +63,32 @@ module Fastlane
         end
       end
 
+      def translate_bunch_of_strings(bunch_size)
+        bunch_index = 0
+        number_of_bunches = (@translation_count / bunch_size.to_f).ceil
+        @to_translate.each_slice(bunch_size) do |bunch|
+          prompt = prepare_bunch_prompt bunch
+          max_retries = 10
+          times_retried = 0
+
+          # translate the source string to the target language
+          begin
+            request_bunch_translate(bunch, prompt, bunch_index, number_of_bunches)
+            bunch_index += 1
+          rescue Net::ReadTimeout => error
+            if times_retried < max_retries
+              times_retried += 1
+              UI.important "Failed to request translation, retry #{times_retried}/#{max_retries}"
+              wait 1
+              retry
+            else
+              UI.error "Can't translate #{key}: #{error}"
+            end
+          end
+          if bunch_index < number_of_bunches - 1 then wait end
+        end
+      end 
+
       # Prepare the prompt for the GPT API
       def prepare_prompt(string) 
         prompt = "I want you to act as a translator for a mobile application strings. " + \
@@ -72,6 +103,32 @@ module Fastlane
         end
         prompt += "Translate next text from #{@params[:source_language]} to #{@params[:target_language]}:\n" +
           "#{string.value}"
+        return prompt
+      end
+
+      def prepare_bunch_prompt(strings)
+        prompt = "I want you to act as a translator for a mobile application strings. " + \
+            "Try to keep length of the translated text. " + \
+            "You need to answer only with the translation and nothing else until I say to stop it."
+        if @params[:context] && !@params[:context].empty?
+          prompt += "This app is #{@params[:context]}. "
+        end
+        prompt += "Translate next text from #{@params[:source_language]} to #{@params[:target_language]}:\n"
+
+        json_hash = []
+        strings.each do |key, string|
+          string_hash = {}
+          context = string.comment
+          if context && !context.empty?
+            string_hash["context"] = context
+          end
+          string_hash["key"] = string.key
+          string_hash["string_to_translate"] = string.value
+          json_hash << string_hash
+        end
+        prompt += "'''\n"
+        prompt += json_hash.to_json
+        prompt += "\n'''"
         return prompt
       end
 
@@ -100,6 +157,48 @@ module Fastlane
             @output_hash[key] = string
           else
             UI.important "#{index_log} Unable to translate #{key_log} - #{string.value}"
+          end
+        end
+      end
+
+      def request_bunch_translate(strings, prompt, index, number_of_bunches)
+        response = @client.chat(
+          parameters: {
+            model: @params[:model_name],
+            messages: [
+              { role: "user", content: prompt }
+            ],
+            temperature: @params[:temperature],
+          }
+        )
+        # extract the translated string from the response
+        error = response.dig("error", "message")
+        
+        #key_log = Colorizer::colorize(key, :blue)
+        index_log = Colorizer::colorize("[#{index + 1}/#{number_of_bunches}]", :white)
+        if error
+          UI.error "#{index_log} Error translating: #{error}"
+        else
+          target_string = response.dig("choices", 0, "message", "content")
+          json_string = target_string[/\[[^\[\]]*\]/m]
+          json_hash = JSON.parse(json_string)
+          keys_to_translate = json_hash.map { |string_hash| string_hash["key"] }
+          json_hash.each do |string_hash|
+            key = string_hash["key"]
+            context = string_hash["context"]
+            string_hash.delete("key")
+            string_hash.delete("context")
+            translated_string = string_hash.values.first
+            if key && !key.empty? && translated_string && !translated_string.empty?
+              UI.message "#{index_log} Translating #{key} - #{translated_string}"
+              string = LocoStrings::LocoString.new(key, translated_string, context)
+              @output_hash[key] = string
+              keys_to_translate.delete(key)
+            end
+          end
+
+          if keys_to_translate.length > 0
+            UI.important "#{index_log} Unable to translate #{keys_to_translate.join(", ")}"
           end
         end
       end
