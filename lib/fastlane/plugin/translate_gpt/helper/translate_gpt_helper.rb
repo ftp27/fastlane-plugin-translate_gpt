@@ -109,7 +109,7 @@ module Fastlane
       def prepare_bunch_prompt(strings)
         prompt = "I want you to act as a translator for a mobile application strings. " + \
             "Try to keep length of the translated text. " + \
-            "You need to answer only with the translation and nothing else until I say to stop it."
+            "You need to response with a JSON only with the translation and nothing else until I say to stop it."
         if @params[:context] && !@params[:context].empty?
           prompt += "This app is #{@params[:context]}. "
         end
@@ -181,7 +181,13 @@ module Fastlane
         else
           target_string = response.dig("choices", 0, "message", "content")
           json_string = target_string[/\[[^\[\]]*\]/m]
-          json_hash = JSON.parse(json_string)
+          begin
+            json_hash = JSON.parse(json_string)
+          rescue => error
+            UI.error "#{index_log} Error parsing JSON: #{error}"
+            UI.error "#{index_log} JSON: \"#{json_string}\""
+            return
+          end
           keys_to_translate = json_hash.map { |string_hash| string_hash["key"] }
           json_hash.each do |string_hash|
             key = string_hash["key"]
