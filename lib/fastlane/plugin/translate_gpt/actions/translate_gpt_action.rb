@@ -84,7 +84,9 @@ module Fastlane
             description: "The path to the Localizable.strings file to be translated",
             verify_block: proc do |value|
               UI.user_error!("Invalid file path: #{value}") unless File.exist?(value)
-              UI.user_error!("Translation file must have .strings extension") unless File.extname(value) == ".strings"
+              extension = File.extname(value)
+              available_extensions = [".strings", ".xcstrings"]
+              UI.user_error!("Translation file must have any of these extensions: #{available_extensions}") unless available_extensions.include? extension
             end
           ),
           FastlaneCore::ConfigItem.new(
@@ -93,7 +95,9 @@ module Fastlane
             description: "Path to the translation file to update",
             verify_block: proc do |value|
               UI.user_error!("Invalid file path: #{value}") unless File.exist?(value)
-              UI.user_error!("Translation file must have .strings extension") unless File.extname(value) == ".strings"
+              extension = File.extname(value)
+              available_extensions = [".strings", ".xcstrings"]
+              UI.user_error!("Translation file must have any of these extensions: #{available_extensions}") unless available_extensions.include? extension
             end
           ),    
           FastlaneCore::ConfigItem.new(

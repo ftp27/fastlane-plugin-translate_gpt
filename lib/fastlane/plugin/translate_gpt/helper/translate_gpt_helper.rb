@@ -16,11 +16,28 @@ module Fastlane
         @timeout = params[:request_timeout]
       end
 
-      # Get the strings from a file
-      def prepare_hashes() 
+      def prepare_xcstrings() 
+        @xcfile = LocoStrings.load(@params[:source_file])
+        @output_hash = {}
+        @to_translate = @xcfile.read
+        if @params[:skip_translated] == true
+          @to_translate = @to_translate.reject { |k, v| @xcfile.value(v.key, @params[:target_language]) }
+        end 
+      end
+
+      def prepare_strings() 
         @input_hash = get_strings(@params[:source_file])
         @output_hash = get_strings(@params[:target_file])
         @to_translate = filter_translated(@params[:skip_translated], @input_hash, @output_hash)
+      end
+
+      # Get the strings from a file
+      def prepare_hashes() 
+        if File.extname(@params[:source_file]) == ".xcstrings"
+          prepare_xcstrings() 
+        else
+          prepare_strings() 
+        end
       end
 
       # Log information about the input strings
@@ -66,6 +83,7 @@ module Fastlane
       def translate_bunch_of_strings(bunch_size)
         bunch_index = 0
         number_of_bunches = (@translation_count / bunch_size.to_f).ceil
+        @keys_associations = {}
         @to_translate.each_slice(bunch_size) do |bunch|
           prompt = prepare_bunch_prompt bunch
           max_retries = 10
@@ -109,7 +127,7 @@ module Fastlane
       def prepare_bunch_prompt(strings)
         prompt = "I want you to act as a translator for a mobile application strings. " + \
             "Try to keep length of the translated text. " + \
-            "You need to response with a JSON only with the translation and nothing else until I say to stop it."
+            "You need to response with a JSON only with the translation and nothing else until I say to stop it. "
         if @params[:context] && !@params[:context].empty?
           prompt += "This app is #{@params[:context]}. "
         end
@@ -122,7 +140,9 @@ module Fastlane
           if context && !context.empty?
             string_hash["context"] = context
           end
-          string_hash["key"] = string.key
+          key = transform_string(string.key)
+          @keys_associations[key] = string.key
+          string_hash["key"] = key
           string_hash["string_to_translate"] = string.value
           json_hash << string_hash
         end
@@ -130,6 +150,12 @@ module Fastlane
         prompt += json_hash.to_json
         prompt += "\n'''"
         return prompt
+      end
+
+      def transform_string(input_string)
+        uppercased_string = input_string.upcase
+        escaped_string = uppercased_string.gsub(/[^0-9a-zA-Z]+/, '_')
+        return escaped_string
       end
 
       # Request a translation from the GPT API
@@ -196,9 +222,10 @@ module Fastlane
             string_hash.delete("context")
             translated_string = string_hash.values.first
             if key && !key.empty? && translated_string && !translated_string.empty?
-              UI.message "#{index_log} Translating #{key} - #{translated_string}"
-              string = LocoStrings::LocoString.new(key, translated_string, context)
-              @output_hash[key] = string
+              real_key = @keys_associations[key]
+              UI.message "#{index_log} Translating #{real_key} - #{translated_string}"
+              string = LocoStrings::LocoString.new(real_key, translated_string, context)
+              @output_hash[real_key] = string
               keys_to_translate.delete(key)
             end
           end
@@ -215,12 +242,20 @@ module Fastlane
         target_string = Colorizer::colorize(@params[:target_file], :white)
         UI.message "Writing #{number_of_strings} strings to #{target_string}..."
 
-        file = LocoStrings.load(@params[:target_file])
-        file.read
-        @output_hash.each do |key, value|
-          file.update(key, value.value, value.comment)
+        if @xcfile.nil?
+          file = LocoStrings.load(@params[:target_file])
+          file.read
+          @output_hash.each do |key, value|
+            file.update(key, value.value, value.comment)
+          end
+          file.write
+        else
+          @xcfile.update_file_path(@params[:target_file])
+          @output_hash.each do |key, value|
+            @xcfile.update(key, value.value, value.comment, @params[:target_language])
+          end
+          @xcfile.write
         end
-        file.write
       end
 
       # Read the strings file into a hash
