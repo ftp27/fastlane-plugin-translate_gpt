@@ -1,6 +1,7 @@
 require 'fastlane_core/ui/ui'
-require 'loco_strings'
+require 'loco_strings/parsers/xcstrings_file'
 require 'json'
+# rubocop:disable all
 
 module Fastlane
   UI = FastlaneCore::UI unless Fastlane.const_defined?("UI")
@@ -17,12 +18,32 @@ module Fastlane
       end
 
       def prepare_xcstrings() 
-        @xcfile = LocoStrings.load(@params[:source_file])
+        @xcfile = LocoStrings::XCStringsFile.new @params[:source_file]
         @output_hash = {}
         @to_translate = @xcfile.read
+        
         if @params[:skip_translated] == true
-          @to_translate = @to_translate.reject { |k, v| @xcfile.value(v.key, @params[:target_language]) }
+          @to_translate = @to_translate.reject { |k, original| 
+            !check_value_for_translate(
+              @xcfile.unit(k, @params[:target_language]),
+              original
+            )
+          }
         end 
+      end
+
+      def check_value_for_translate(string, orignal_string)
+        return true unless string 
+        if string.is_a? LocoStrings::LocoString
+          return false if orignal_string.value.nil? || orignal_string.value.empty?
+          return string.value.empty?
+        elsif string.is_a? LocoStrings::LocoVariantions
+          orignal_string.strings.each do |key, _|
+            return true unless string.strings.has_key?(key)
+            return true if string.strings[key].value.empty?
+          end
+        end
+        return false
       end
 
       def prepare_strings() 
@@ -86,6 +107,10 @@ module Fastlane
         @keys_associations = {}
         @to_translate.each_slice(bunch_size) do |bunch|
           prompt = prepare_bunch_prompt bunch
+          if prompt.empty?
+            UI.important "Empty prompt, skipping bunch"
+            next
+          end
           max_retries = 10
           times_retried = 0
 
@@ -135,20 +160,37 @@ module Fastlane
 
         json_hash = []
         strings.each do |key, string|
+          UI.message "Translating #{key} - #{string}"
+          next if string.nil?
+
           string_hash = {}
           context = string.comment
-          if context && !context.empty?
-            string_hash["context"] = context
-          end
+          string_hash["context"] = context if context && !context.empty?
+
           key = transform_string(string.key)
           @keys_associations[key] = string.key
           string_hash["key"] = key
-          string_hash["string_to_translate"] = string.value
+
+          if string.is_a? LocoStrings::LocoString
+            next if string.value.nil? || string.value.empty?
+            string_hash["string_to_translate"] = string.value
+          elsif string.is_a? LocoStrings::LocoVariantions
+            variants = {}
+            string.strings.each do |key, variant|
+              next if variant.nil? || variant.value.nil? || variant.value.empty?
+              variants[key] = variant.value
+            end
+            string_hash["strings_to_translate"] = variants
+          else 
+            UI.warning "Unknown type of string: #{string.key}"
+          end
           json_hash << string_hash
         end
+        return '' if json_hash.empty?
         prompt += "'''\n"
         prompt += json_hash.to_json
         prompt += "\n'''"
+        UI.message "Prompt: #{prompt}"
         return prompt
       end
 
@@ -221,13 +263,21 @@ module Fastlane
             string_hash.delete("key")
             string_hash.delete("context")
             translated_string = string_hash.values.first
-            if key && !key.empty? && translated_string && !translated_string.empty?
-              real_key = @keys_associations[key]
+            return unless key && !key.empty? 
+            real_key = @keys_associations[key]
+            if translated_string.is_a? Hash
+              strings = {}
+              translated_string.each do |pl_key, value|
+                UI.message "#{index_log} Translating #{real_key} > #{pl_key} - #{value}"
+                strings[pl_key] = LocoStrings::LocoString.new(pl_key, value, context)
+              end
+              string = LocoStrings::LocoVariantions.new(real_key, strings, context)
+            elsif translated_string && !translated_string.empty?
               UI.message "#{index_log} Translating #{real_key} - #{translated_string}"
               string = LocoStrings::LocoString.new(real_key, translated_string, context)
-              @output_hash[real_key] = string
-              keys_to_translate.delete(key)
             end
+            @output_hash[real_key] = string
+            keys_to_translate.delete(key)
           end
 
           if keys_to_translate.length > 0
@@ -252,7 +302,13 @@ module Fastlane
         else
           @xcfile.update_file_path(@params[:target_file])
           @output_hash.each do |key, value|
-            @xcfile.update(key, value.value, value.comment, @params[:target_language])
+            if value.is_a? LocoStrings::LocoString
+              @xcfile.update(key, value.value, value.comment, "translated", @params[:target_language])
+            elsif value.is_a? LocoStrings::LocoVariantions
+              value.strings.each do |pl_key, variant|
+                @xcfile.update_variation(key, pl_key, variant.value, variant.comment, "translated", @params[:target_language])
+              end
+            end
           end
           @xcfile.write
         end
@@ -333,3 +389,5 @@ module Fastlane
     end
   end
 end
+
+# rubocop:enable all
