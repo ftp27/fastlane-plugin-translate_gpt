@@ -190,7 +190,6 @@ module Fastlane
         prompt += "'''\n"
         prompt += json_hash.to_json
         prompt += "\n'''"
-        UI.message "Prompt: #{prompt}"
         return prompt
       end
 
