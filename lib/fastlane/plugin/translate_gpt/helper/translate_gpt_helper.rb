@@ -125,7 +125,7 @@ module Fastlane
               wait 1
               retry
             else
-              UI.error "Can't translate #{key}: #{error}"
+              UI.error "Can't translate the bunch: #{error}"
             end
           end
           if bunch_index < number_of_bunches - 1 then wait end
