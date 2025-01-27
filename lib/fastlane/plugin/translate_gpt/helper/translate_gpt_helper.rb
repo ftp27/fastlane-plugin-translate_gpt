@@ -160,7 +160,7 @@ module Fastlane
 
         json_hash = []
         strings.each do |key, string|
-          UI.message "Translating #{key} - #{string}"
+          UI.message "Translating #{key} - #{string.value}"
           next if string.nil?
 
           string_hash = {}
@@ -267,12 +267,12 @@ module Fastlane
             if translated_string.is_a? Hash
               strings = {}
               translated_string.each do |pl_key, value|
-                UI.message "#{index_log} Translating #{real_key} > #{pl_key} - #{value}"
+                UI.message "#{index_log} #{real_key}: #{pl_key} - #{value}"
                 strings[pl_key] = LocoStrings::LocoString.new(pl_key, value, context)
               end
               string = LocoStrings::LocoVariantions.new(real_key, strings, context)
             elsif translated_string && !translated_string.empty?
-              UI.message "#{index_log} Translating #{real_key} - #{translated_string}"
+              UI.message "#{index_log} #{real_key}: #{translated_string}"
               string = LocoStrings::LocoString.new(real_key, translated_string, context)
             end
             @output_hash[real_key] = string
@@ -299,13 +299,14 @@ module Fastlane
           end
           file.write
         else
+          default_state = if :mark_for_review then "needs_review" else "translated" end
           @xcfile.update_file_path(@params[:target_file])
           @output_hash.each do |key, value|
             if value.is_a? LocoStrings::LocoString
-              @xcfile.update(key, value.value, value.comment, "translated", @params[:target_language])
+              @xcfile.update(key, value.value, value.comment, default_state, @params[:target_language])
             elsif value.is_a? LocoStrings::LocoVariantions
               value.strings.each do |pl_key, variant|
-                @xcfile.update_variation(key, pl_key, variant.value, variant.comment, "translated", @params[:target_language])
+                @xcfile.update_variation(key, pl_key, variant.value, variant.comment, default_state, @params[:target_language])
               end
             end
           end
