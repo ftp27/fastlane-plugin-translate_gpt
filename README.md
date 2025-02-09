@@ -53,7 +53,7 @@ The following options are available for `translate-gpt`:
 | `source_file` | The path to the `Localizable.strings` or `strings.xml` file to be translated. | `GPT_SOURCE_FILE` |
 | `target_file` | The path to the output file for the translated strings. | `GPT_TARGET_FILE` |
 | `context` | Common context for the translation | `GPT_COMMON_CONTEXT` |
-| `bunch_size` | Number of strings to translate in a single request.| `GPT_BUNCH_SIZE` |
+| `bunch_size` | Number of strings to translate in a single request. If you have issues with failed request try `max_input_tokens` option | `GPT_BUNCH_SIZE` |
 | `max_input_tokens` | Maximum number of tokens in the input string. `bunch_size` will be ignored | `GPT_MAX_INPUT_TOKENS` |
 | `mark_for_review` | If string has been translated by GPT, mark it for review | `GPT_MARK_FOR_REVIEW` |
 
