@@ -23,7 +23,7 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = '>= 2.6'
 
   spec.add_runtime_dependency 'loco_strings', '~> 0.1.5'
-  spec.add_runtime_dependency 'ruby-openai', '~> 3.7'
+  spec.add_runtime_dependency 'ruby-openai', '~> 7.3.1'
 
   spec.add_development_dependency('bundler')
   spec.add_development_dependency('fastlane', '>= 2.212.2')

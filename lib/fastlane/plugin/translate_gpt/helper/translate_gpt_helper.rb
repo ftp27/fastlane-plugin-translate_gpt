@@ -1,6 +1,7 @@
 require 'fastlane_core/ui/ui'
 require 'loco_strings/parsers/xcstrings_file'
 require 'json'
+require 'openai'
 # rubocop:disable all
 
 module Fastlane
@@ -106,31 +107,77 @@ module Fastlane
         number_of_bunches = (@translation_count / bunch_size.to_f).ceil
         @keys_associations = {}
         @to_translate.each_slice(bunch_size) do |bunch|
-          prompt = prepare_bunch_prompt bunch
-          if prompt.empty?
-            UI.important "Empty prompt, skipping bunch"
-            next
-          end
-          max_retries = 10
-          times_retried = 0
-
-          # translate the source string to the target language
-          begin
-            request_bunch_translate(bunch, prompt, bunch_index, number_of_bunches)
+          begin 
+            progress = (bunch_index / number_of_bunches.to_f * 100).round
+            request_bunch(bunch, progress)
             bunch_index += 1
-          rescue Net::ReadTimeout => error
-            if times_retried < max_retries
-              times_retried += 1
-              UI.important "Failed to request translation, retry #{times_retried}/#{max_retries}"
-              wait 1
-              retry
-            else
-              UI.error "Can't translate the bunch: #{error}"
-            end
+          rescue "Empty prompt"
+            next
           end
           if bunch_index < number_of_bunches - 1 then wait end
         end
       end 
+
+      def translate_bunch_with_tokenizer(max_tokens)
+        string_index = 0 
+        @keys_associations = {}
+        current_bunch = {}
+        @to_translate.each do |key, string|
+          string_index += 1
+          tmp_bunch = current_bunch.clone
+          tmp_bunch[key] = string
+
+          prompt = prepare_bunch_prompt tmp_bunch
+          tokens = OpenAI.rough_token_count(prompt)
+          if tokens > max_tokens
+            if current_bunch.empty?
+              string_index -= 1
+              UI.error "Can't translate #{key}: string is too long"
+              next
+            end
+            prompt = prepare_bunch_prompt current_bunch
+            progress = (string_index / @translation_count.to_f * 100).round
+            request_bunch(bunch, progress)
+            current_bunch = {}
+            current_bunch[key] = string
+            if progress < 100 then wait end
+          else 
+            current_bunch = tmp_bunch
+          end
+        end
+
+        if !current_bunch.empty?
+          prompt = prepare_bunch_prompt current_bunch
+          progress = (string_index / @translation_count.to_f * 100).round
+          request_bunch(current_bunch, progress)
+        end
+
+      end 
+
+      def request_bunch(bunch, progress) 
+        UI.message "[#{progress}%] Translating #{bunch.size} strings..."
+        prompt = prepare_bunch_prompt bunch
+        if prompt.empty?
+          UI.important "Empty prompt, skipping bunch"
+          raise "Empty prompt"
+        end
+        max_retries = 10
+        times_retried = 0
+
+        # translate the source string to the target language
+        begin
+          request_bunch_translate(bunch, prompt, progress)
+        rescue Net::ReadTimeout => error
+          if times_retried < max_retries
+            times_retried += 1
+            UI.important "Failed to request translation, retry #{times_retried}/#{max_retries}"
+            wait 1
+            retry
+          else
+            UI.error "Can't translate the bunch: #{error}"
+          end
+        end
+      end
 
       # Prepare the prompt for the GPT API
       def prepare_prompt(string) 
@@ -160,7 +207,7 @@ module Fastlane
 
         json_hash = []
         strings.each do |key, string|
-          UI.message "Translating #{key} - #{string.value}"
+          # UI.message "Translating #{key} - #{string.value}"
           next if string.nil?
 
           string_hash = {}
@@ -228,7 +275,7 @@ module Fastlane
         end
       end
 
-      def request_bunch_translate(strings, prompt, index, number_of_bunches)
+      def request_bunch_translate(strings, prompt, progress)
         response = @client.chat(
           parameters: {
             model: @params[:model_name],
@@ -242,7 +289,7 @@ module Fastlane
         error = response.dig("error", "message")
         
         #key_log = Colorizer::colorize(key, :blue)
-        index_log = Colorizer::colorize("[#{index + 1}/#{number_of_bunches}]", :white)
+        index_log = Colorizer::colorize("[#{progress}%]", :white)
         if error
           UI.error "#{index_log} Error translating: #{error}"
         else

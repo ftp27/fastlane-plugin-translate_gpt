@@ -1,5 +1,4 @@
 require 'fastlane/action'
-require 'openai'
 require_relative '../helper/translate_gpt_helper'
 require 'loco_strings'
 
@@ -10,8 +9,11 @@ module Fastlane
         helper = Helper::TranslateGptHelper.new(params)
         helper.prepare_hashes
         bunch_size = params[:bunch_size]
+        max_input_tokens = params[:max_input_tokens]
         helper.log_input(bunch_size)
-        if bunch_size.nil? || bunch_size < 1
+        if !max_input_tokens.nil? && max_input_tokens > 0
+          helper.translate_bunch_with_tokenizer(max_input_tokens)
+        elsif bunch_size.nil? || bunch_size < 1
           helper.translate_strings
         else
           helper.translate_bunch_of_strings(bunch_size)
@@ -119,13 +121,20 @@ module Fastlane
             type: Integer
           ),
           FastlaneCore::ConfigItem.new(
+            key: :max_input_tokens,
+            env_name: 'GPT_MAX_INPUT_TOKENS',
+            description: 'Maximum number of tokens in the input request',
+            type: Integer,
+            optional: true
+          ),
+          FastlaneCore::ConfigItem.new(
             key: :mark_for_review,
             env_name: 'GPT_MARK_FOR_REVIEW',
             description: 'If string has been translated by GPT, mark it for review',
             type: Boolean,
             optional: true,
             default_value: false
-          )
+          ),
         ]
       end
 
