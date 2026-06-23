@@ -111,7 +111,7 @@ module Fastlane
             progress = (bunch_index / number_of_bunches.to_f * 100).round
             request_bunch(bunch, progress)
             bunch_index += 1
-          rescue "Empty prompt"
+          rescue StandardError
             next
           end
           if bunch_index < number_of_bunches - 1 then wait end
